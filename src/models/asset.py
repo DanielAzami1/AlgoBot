@@ -4,24 +4,18 @@ Class definitions for financial s'assets'.
 from abc import ABC, abstractmethod
 from loguru import logger
 from datetime import date
+from typing import Optional, List
 import sys
 
 sys.path.append('..')
 """Local imports"""
+from models.company import Company
 from misc.enums import AssetType
 from misc.utils import normalize_symbol, currency
 
 class Asset(ABC):
     @abstractmethod
     def __init__(self):
-        pass
-
-    @abstractmethod
-    def load_price_history(self, start_date: date, end_date: date, freq=None):
-        pass
-
-    @abstractmethod
-    def download_price_data(self, start_date: date, end_date: date, freq=None):
         pass
 
     @abstractmethod
@@ -34,28 +28,23 @@ class Asset(ABC):
 
 
 class Stock(Asset):
-    def __init__(
+    def __init__( 
         self, 
         symbol: str,
-        company_name: str,
-        live_price: float
+        live_price: float,
+        company: Optional[Company],
+        price_data: Optional[List] = None
     ):
         self.asset_type = AssetType.Stock
         self.symbol = normalize_symbol(symbol)
-        self.company_name = company_name
         self.live_price = live_price
-        logger.success(f"Stock obj with symbol {symbol} successfully created.")
+        self.company = company
+        self.price_data = price_data
     
-    def load_price_history(self, start_date: date, end_date: date, freq=None):
-        return super().load_price_history(start_date, end_date, freq)
-    
-    def download_price_data(self, start_date: date, end_date: date, freq=None):
-        return super().download_price_data(start_date, end_date, freq)
-
     def __str__(self):
         return (f"          [Stock] \n" 
                 f"      Symbol: {self.symbol:} \n"
-                f"     Company: {self.company_name} \n"
+                f"     Company: {self.company.company_name} \n"
                 f"  Live Price: {currency(self.live_price)} \n"
             )
 

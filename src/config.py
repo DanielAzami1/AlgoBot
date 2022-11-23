@@ -1,0 +1,1 @@
+_COMPANY_BASE_DB_PATH = "tables\\company_dummy.db"
