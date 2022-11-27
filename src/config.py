@@ -1,1 +1,2 @@
-_COMPANY_BASE_DB_PATH = "tables\\company_dummy.db"
+BASE_DB_PATH = "databases\\sqlite.db"
+BASE_DB_PATH_DUMMY = "databases\\sqlite_dummy.db"
