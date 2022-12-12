@@ -1,0 +1,6 @@
+{
+  "BASE_DB_PATH": "databases\\sqlite.db",
+  "BASE_DB_PATH_DUMMY": "databases\\sqlite_dummy.db",
+  "TICKER_DATA_PATH": "ticker_data\\",
+  "PORTFOLIO_DATA_PATH": "portfolio_data\\"
+}
