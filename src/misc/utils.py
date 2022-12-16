@@ -5,12 +5,13 @@ from typing import Dict, Callable, Iterable
 from loguru import logger
 from datetime import datetime
 import concurrent.futures
+import os
 
 
 def normalize_symbol(symbol: str) -> str:
     symbol = symbol.replace(" ", "")
     if len(symbol) > 5 or not symbol:
-        raise ValueError(f"Symbol '{symbol}' must be between 1 and 4 letters long.")
+        raise ValueError(f"Symbol '{symbol}' must be between 1 and 5 letters long.")
     return symbol.upper()
 
 
@@ -24,8 +25,8 @@ def save_cfg(config: Dict, cfg_file: str = "../config.json"):
     logger.debug(f"UPDATED {cfg_file}")
 
 
-def load_cfg(cfg_file: str = "../config.json") -> Dict:
-    logger.debug(f"LOADING {cfg_file}")
+def load_cfg(prepend_path: str) -> Dict:
+    cfg_file = os.path.join(prepend_path, "config.json")
     with open(cfg_file, 'r') as cfg:
         return json.load(cfg)
 

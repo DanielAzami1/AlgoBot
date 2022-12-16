@@ -1,12 +1,12 @@
-import pprint
-from datetime import datetime
-
+from loguru import logger
+import random
 from src.classes.asset import Stock
-from src.classes.holding import Holding
 from src.classes.portfolio import Portfolio
 from src.classes.company import Company
-
-from src.data.download_remote_data import download_ticker_data
+from src.classes.transaction import Transaction
+from src.data.download_remote_data import download_index_constituents, load_ticker_market_data_from_csv,\
+    download_ticker_data
+from src.data.models import fetch_from_company_table, insert_into_transactions_table
 
 """
 Overall Portfolio structure::
@@ -14,47 +14,57 @@ Overall Portfolio structure::
     Portfolio[List[Holding[Stock]]]
 """
 
-symbols = ["AAPL", "META", "GM", "TSLA"]
-stock_data = {}
 
-for symbol in symbols:
-    data = download_ticker_data(
-        symbol=symbol,
-        period="5d",
-        include_metadata=True,
-        use_cache=True
-    )
-    stock_data[symbol] = data
-
-aapl = stock_data["AAPL"]
-aapl_metadata = aapl["metadata"]
-aapl_market_data = aapl["market_data"]
-
-# pprint.pprint(aapl_metadata)
+# def view_stocks_for_portfolio(p: Portfolio):
+#     stock_pool = download_index_constituents()
+#     continue_viewing_stocks: bool = True
+#     while continue_viewing_stocks:
+#         symbol = random.choice(stock_pool)
+#         try:
+#             company: Company = fetch_from_company_table(symbol)[0]
+#         except IndexError as e:
+#             logger.warning(e)
+#             continue
 #
-# pprint.pprint(aapl_market_data)
+#         try:
+#             market_data = load_ticker_market_data_from_csv(symbol)
+#             stock: Stock = Stock(symbol=symbol, company=company, market_data=market_data)
+#         except Exception as err:
+#             logger.warning(err)
+#             continue
+#
+#         print(stock)
+#         print(p.get_free_cash())
+#         purchase = input("Add to portfolio? (Y/N) - QUIT to stop\n").upper()
+#         if purchase == 'Y':
+#             qty = int(input("Number of shares:\n"))
+#             try:
+#                 p.purchase_asset(stock, qty)
+#             except ValueError as err:
+#                 logger.warning(err)
+#                 continue
+#         elif purchase == 'QUIT':
+#             continue_viewing_stocks = False
+#
+#     return portfolio
+#
+#
+# portfolio: Portfolio = Portfolio(name="MyFirstPortfolio")
+#
+# portfolio = view_stocks_for_portfolio(portfolio)
+# print("\n\n")
+# print(portfolio)
+# portfolio.print_holdings()
+# portfolio.print_transaction_history()
+# print("\n\n")
+# portfolio.sell_asset()
+# def save_transactions(transactions: List[Transaction]):
+#     insert_into_transactions_table(*transactions)
 
-aapl_company = Company(
-    symbol=aapl_metadata["symbol"],
-    company_name=aapl_metadata["longName"],
-    sector=aapl_metadata["sector"],
-    industry=aapl_metadata["industry"],
-    business_summary=aapl_metadata["longBusinessSummary"],
-    country=aapl_metadata["country"],
-    employee_count=aapl_metadata["fullTimeEmployees"],
-    market_cap=aapl_metadata["marketCap"],
-    float_shares=aapl_metadata["floatShares"],
-    is_esg_populated=aapl_metadata["isEsgPopulated"]
-)
+symbol = "aapl"
+market_data = download_ticker_data(symbol=symbol, interval="1m")
+print(market_data)
 
-aapl_stock = Stock(
-    symbol=aapl_metadata["symbol"],
-    company=aapl_company
-)
 
-aapl_holding = Holding(
-    stock=aapl_stock,
-    qty_owned=10,
-    date_purchased=datetime.now()
-)
+
 

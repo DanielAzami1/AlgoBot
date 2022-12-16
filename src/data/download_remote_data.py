@@ -4,14 +4,17 @@ from typing import Optional, Dict, List
 from datetime import date
 from loguru import logger
 import pandas as pd
+import pathlib
 import os
-from src.misc.utils import load_cfg, normalize_symbol, timed, debug, use_threadpool_exec
+from src.misc.utils import load_cfg, normalize_symbol, timed
 
 VALID_PERIODS = ("1d", "5d", "1mo", "3mo", "6mo", "1y", "2y", "5y", "10y", "ytd", "max")
 VALID_INTERVALS = ("1m", "2m", "5m", "15m", "30m", "60m",
                    "90m", "1h", "1d", "5d", "1wk", "1mo, 3mo")
-cfg = load_cfg()
-TICKER_DATA_PATH = cfg["TICKER_DATA_PATH"]
+
+module_path = pathlib.Path(__file__).parent.resolve()
+cfg = load_cfg(prepend_path=os.path.join(module_path, '..'))
+TICKER_DATA_PATH = os.path.join(module_path, cfg["TICKER_DATA_PATH"])
 
 
 @timed
@@ -50,9 +53,21 @@ def download_ticker_data(
         period: Optional[str] = "max",
         interval: Optional[str] = "1d",
         include_metadata: Optional[bool] = False,
-        use_cache: Optional[bool] = True
+        use_cache: Optional[bool] = True,
+        append_data: Optional[bool] = False
 ) -> Dict:
-    """Fetch market and meta data for given stock. Period (e.g. 1d) can be passed in-leu of start & end date"""
+    """
+    Fetch market and optionally meta data for given stock. Period (e.g. 1d) can be passed in-leu of start & end date
+    :param symbol: symbol to retrieve data for.
+    :param start_date: optional start date.
+    :param end_date: optional end date.
+    :param period: alternative to start&end date (e.g. 1d).
+    :param interval: time between each record (e.g. for intraday data).
+    :param include_metadata: include information about the company.
+    :param use_cache: use requests_cache to store api call.
+    :param append_data: append data to the corresponding data csv file.
+    :return: None
+    """
     assert start_date or period
     if start_date and not end_date:
         end_date = date.today()
@@ -71,10 +86,13 @@ def download_ticker_data(
     )
     metadata = stock_data.info if include_metadata else None
     if metadata and metadata.get("longName", None) is None:
+        logger.warning(f"Metadata missing for symbol download {symbol}")
         return {}
     market_data = stock_data.history(start=start_date, end=end_date, period=period, interval=interval)
     if not os.path.exists(os.path.join(TICKER_DATA_PATH, f"{symbol}.csv")):
         save_ticker_market_data_to_csv(symbol, market_data)
+    if append_data:
+        save_ticker_market_data_to_csv(symbol, market_data, append=True)
     return {
         "metadata": metadata,
         "market_data": market_data
@@ -92,14 +110,27 @@ def download_index_constituents(
     return list(tickers)
 
 
-def save_ticker_market_data_to_csv(symbol: str, market_data: pd.DataFrame) -> None:
+def save_ticker_market_data_to_csv(symbol: str, market_data: pd.DataFrame, append: bool = False) -> None:
     """
     Save downloaded market data for given ticker.
     """
     symbol = normalize_symbol(symbol)
     path = os.path.join(TICKER_DATA_PATH, f'{symbol}.csv')
-    market_data.to_csv(path_or_buf=path)
-    logger.debug(f"Saved market data for {symbol} to {path}")
+    if append:
+        market_data.to_csv(path_or_buf=path, mode='a', header=False)
+    else:
+        market_data.to_csv(path_or_buf=path)
+    logger.debug(f"Saved market data ({len(market_data.index)} rows) for {symbol} to {path}")
+
+
+def load_ticker_market_data_from_csv(symbol: str) -> pd.DataFrame:
+    """
+    Load downloaded market data for given ticker (from csv).
+    """
+    symbol = normalize_symbol(symbol)
+    path = os.path.join(TICKER_DATA_PATH, f'{symbol}.csv')
+    market_data = pd.read_csv(filepath_or_buffer=path, index_col="Date")
+    return market_data
 
 
 if __name__ == "__main__":
@@ -114,8 +145,8 @@ if __name__ == "__main__":
     #     ticker, period="5d", include_metadata=True
     # )
     # print(data['market_data'])
-    tickers = download_index_constituents()
-    ticker_data = use_threadpool_exec(download_ticker_data, tickers)
-
+    # ticks = download_index_constituents()
+    # ticks_data = use_threadpool_exec(download_ticker_data, ticks)
+    pass
 
 

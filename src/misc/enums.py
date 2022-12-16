@@ -6,10 +6,14 @@ class AssetType(Enum):
 
 
 class Direction(Enum):
-    Buy = "buy"
-    Sell = "sell"
+    Buy = "BUY"
+    Sell = "SELL"
 
 
 class OrderType(Enum):
-    Market = "market"
-    Limit = "limit"
+    Market = "MARKET"
+    Limit = "LIMIT"
+
+
+class StockPool(Enum):
+    SNP500 = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
