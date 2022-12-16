@@ -66,9 +66,13 @@ if __name__ == "__main__":
             except Exception as e:
                 logger.warning(e)
                 continue
+        if purchase == "q":
+            continue_building = False
     print(p)
     p.print_holdings()
     p.print_transaction_history()
     print(p.get_value_of_holdings())
+    from IPython import embed
+    embed()
 
 

@@ -5,6 +5,7 @@ from src.classes.holding import Holding
 from src.classes.asset import Stock
 from src.classes.transaction import Transaction, MarketBuy, MarketSell
 from src.misc.utils import currency
+from src.data.models import insert_into_portfolio_table, insert_into_transactions_table, insert_into_holdings_table
 
 
 class Portfolio:
@@ -65,13 +66,6 @@ class Portfolio:
             logger.success(f"Sold {sell_order.qty} shares of {sell_order.symbol}")
         self.transaction_history.append(sell_order)
 
-    def get_value_of_holdings(self, date: datetime = None):
-        val = 0
-        if not date:
-            for holding in self.holdings:
-                val += self.holdings[holding].get_market_value()
-        return val
-
     def _holding_present_in_portfolio(self, symbol: str) -> bool:
         try:
             _ = self.holdings[symbol]
@@ -79,11 +73,21 @@ class Portfolio:
         except KeyError:
             return False
 
-    def get_num_holdings(self):
-        return len(self.holdings) if self.holdings else None
+    def get_value_of_holdings(self, date: datetime = None):
+        val = 0
+        if not date:
+            for holding in self.holdings:
+                val += self.holdings[holding].get_market_value()
+        return val
 
     def get_free_cash(self):
         return f"(Cash) {currency(self.free_cash)}"
+
+    def get_total_value(self):
+        return self.free_cash + self.get_value_of_holdings()
+
+    def get_num_holdings(self):
+        return len(self.holdings) if self.holdings else None
 
     def print_holdings(self):
         print("Holdings:\n")
@@ -100,6 +104,15 @@ class Portfolio:
         for value in self.value_history:
             print(value)
 
+    def save_portfolio_state(self):
+        insert_into_portfolio_table(portfolio=self.name, value=self.get_total_value(), timestamp=datetime.now())
+
+    def save_portfolio_transactions(self):
+        insert_into_transactions_table(*self.transaction_history, portfolio=self.name)
+
+    def save_holdings(self):
+        insert_into_holdings_table(*self.holdings.values(), portfolio=self.name)
+
     def __str__(self):
         return f"Portfolio [{self.name}]: {self.get_num_holdings()} unique holdings" \
                f" ({currency(self.get_value_of_holdings())})" \
@@ -107,24 +120,3 @@ class Portfolio:
 
     def __repr__(self):
         return "Portfolio<name, free_cash, holdings, value_history>"
-
-
-class Holding:
-    def __init__(self, stock: Stock, qty_owned: int, date_purchased: datetime = datetime.now()):
-        assert qty_owned > 0
-        assert date_purchased <= datetime.today()
-        self.qty_owned = qty_owned
-        self.date_purchased = date_purchased
-        self.stock = stock
-
-    def get_market_value(self):
-        return self.stock.get_live_price() * self.qty_owned
-
-    def __str__(self):
-        return f"[Holding] {self.stock.company.company_name} ({self.stock.symbol}) | {self.qty_owned} shares @ " \
-               f"{currency(self.stock.get_live_price())} | " \
-               f"Market Value: {currency(self.get_market_value())} | " \
-               f" purchased {format_datetime_12h(self.date_purchased)}"
-
-    def __repr__(self):
-        return "Holding<Stock, qty_owned, date_purchased>"
