@@ -87,9 +87,12 @@ def insert_into_company_table(*companies: Company):
     db.connect()
     with db.atomic():
         for company in companies:
-            model = CompanyModel.create(**vars(company))
+            model, created = CompanyModel.get_or_create(**vars(company))
             model.save()
-            logger.success(f"Inserted into Company: {company.company_name} ({company.symbol})")
+            if created:
+                logger.success(f"Inserted into Company: {company.company_name} ({company.symbol})")
+            else:
+                logger.warning(f"Company {company.company_name} ({company.symbol}) already present in table.")
     logger.debug(f"Inserted {len(companies)} companies into company table.")
     db.close()
 
@@ -104,7 +107,9 @@ def insert_into_holdings_table(*holdings: Holding, portfolio: str):
     db.connect()
     with db.atomic():
         for holding in holdings:
-            model = CompanyModel.create(**vars(holding), portfolio=portfolio)
+            model, created = CompanyModel.create(**vars(holding), portfolio=portfolio)
+            if not created:
+                model.update(qty=holding.qty_owned)
             model.save()
             logger.success(f"Inserted into Holding: {holding}")
     db.close()
@@ -120,7 +125,7 @@ def insert_into_transactions_table(*transactions: Transaction, portfolio: str):
     db.connect()
     with db.atomic():
         for transaction in transactions:
-            model = TransactionModel.create(**vars(transaction), portfolio=portfolio)
+            model, _ = TransactionModel.get_or_create(**vars(transaction), portfolio=portfolio)
             model.save()
             logger.success(f"Inserted into Transaction: "
                            f"{transaction.symbol}: {transaction.order_type} {transaction.direction}")
@@ -136,7 +141,7 @@ def insert_into_portfolio_table(portfolio: str, value: float, timestamp: datetim
     :return: None
     """
     db.connect()
-    model = PortfolioModel.create(date=timestamp, portfolio=portfolio, value=value)
+    model, _ = PortfolioModel.get_or_create(date=timestamp, portfolio=portfolio, value=value)
     model.save()
     logger.success(f"Inserted into Portfolio a new value for {portfolio} - {currency(value)} <{timestamp}>")
     db.close()
