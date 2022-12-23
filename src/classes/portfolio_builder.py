@@ -6,20 +6,17 @@ from src.classes.asset import Stock
 from src.classes.transaction import MarketBuy
 from src.misc.enums import StockPool
 from src.data.download_remote_data import download_index_constituents
+from src.data.models import fetch_from_company_table
 
 
 class PortfolioBuilder:
     def __init__(self, portfolio: Portfolio, stock_pool: StockPool):
-        self.name = f"{portfolio.name}_builder"
         self.portfolio = portfolio
-        self.stocks = []
-        _stock_pool = download_index_constituents(index_url=stock_pool.value)
-        for symbol in _stock_pool:
-            try:
-                self.stocks.append(Stock(symbol))
-            except Exception as e:
-                logger.warning(e)
-
+        self.name = f"{portfolio.name}_builder"
+        self._stock_pool = stock_pool.value
+        _stock_pool = download_index_constituents(index_url=self._stock_pool)
+        _stock_pool = fetch_from_company_table(*_stock_pool)
+        self.stocks = [Stock(symbol=company.symbol, company=company) for company in _stock_pool]
         self._filtered_pool = None
 
     def fetch_new_stock(self):
@@ -48,6 +45,7 @@ class PortfolioBuilder:
 if __name__ == "__main__":
     p = Portfolio(name="MyPortfolio")
     pb = PortfolioBuilder(portfolio=p, stock_pool=StockPool.SNP500)
+    print(p)
     continue_building = True
     while continue_building:
         new_stock = pb.fetch_new_stock()
@@ -68,10 +66,11 @@ if __name__ == "__main__":
                 continue
         if purchase == "q":
             continue_building = False
+
     print(p)
-    p.print_holdings()
-    p.print_transaction_history()
-    print(p.get_value_of_holdings())
+    for hldn in p.holdings:
+        print(hldn)
+
     from IPython import embed
     embed()
 

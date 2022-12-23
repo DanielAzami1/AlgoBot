@@ -1,5 +1,6 @@
 from datetime import datetime
 from abc import ABC, abstractmethod
+from typing import Optional
 from src.misc.enums import Direction, OrderType
 from src.misc.utils import normalize_symbol, currency, format_datetime_12h
 
@@ -13,12 +14,9 @@ class Transaction(ABC):
             direction: Direction,
             order_type: OrderType,
             price: float,
-            qty: int
+            qty: int,
+            portfolio: Optional[str] = None
     ):
-        now = datetime.now()
-        if now > date:
-            raise ValueError(f"Given date for new transaction is ahead of current date:\n"
-                             f"{date} > {now}")
         if price < 0:
             raise ValueError(f"Price cannot be less than 0: ({currency(price)})")
         if qty < 0:
@@ -39,7 +37,7 @@ class Transaction(ABC):
                f" - {self.qty} shares @ {currency(self.price)}"
 
     def __repr__(self):
-        return "Transaction<date, symbol, direction, order_type, price, qty, purchase_value>"
+        return "Transaction<date, symbol, direction, order_type, price, qty, market_value>"
 
 
 class MarketBuy(Transaction):

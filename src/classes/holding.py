@@ -1,18 +1,14 @@
-"""
-Class definition for 'holdings' of assets. 
-Represents the ownership details of a given asset (e.g. price bought at, time held, number of shares held, etc.)
-"""
 from datetime import datetime
 from src.misc.utils import format_datetime_12h, currency
 
 
 class Holding:
-    def __init__(self, stock, qty_owned: int, date_purchased: datetime = datetime.now()):
-        assert qty_owned > 0
-        assert date_purchased <= datetime.today()
+    def __init__(self, symbol: str, stock=None, qty_owned: int = 0, date_purchased: datetime = datetime.now()):
+        assert qty_owned >= 0
+        self.symbol = symbol
+        self.stock = stock
         self.qty_owned = qty_owned
         self.date_purchased = date_purchased
-        self.stock = stock
 
     def get_market_value(self):
         return self.stock.get_live_price() * self.qty_owned

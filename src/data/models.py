@@ -72,10 +72,9 @@ def create_table(*models: Type[Model]):
     :param models: (positional) CompanyModel, HoldingModel, TransactionModel, PortfolioModel - tables to be created.
     :return: None
     """
-    db.connect()
-    db.create_tables(models)
-    logger.success(f"Tables ready for {models}")
-    db.close()
+    with db:
+        db.create_tables(models)
+        logger.success(f"Tables ready for {models}")
 
 
 @timed
@@ -84,7 +83,6 @@ def insert_into_company_table(*companies: Company):
     :param companies: (positional) Company objects to be inserted into the Company table.
     :return: None
     """
-    db.connect()
     with db.atomic():
         for company in companies:
             model, created = CompanyModel.get_or_create(**vars(company))
@@ -94,7 +92,6 @@ def insert_into_company_table(*companies: Company):
             else:
                 logger.warning(f"Company {company.company_name} ({company.symbol}) already present in table.")
     logger.debug(f"Inserted {len(companies)} companies into company table.")
-    db.close()
 
 
 @timed
@@ -104,15 +101,16 @@ def insert_into_holdings_table(*holdings: Holding, portfolio: str):
     :param holdings: (positional) Holding objects to be inserted into the Holding table.
     :return: None
     """
-    db.connect()
     with db.atomic():
         for holding in holdings:
-            model, created = CompanyModel.create(**vars(holding), portfolio=portfolio)
+            model, created = HoldingModel.get_or_create(symbol=holding.stock.symbol,
+                                                        qty_owned=holding.qty_owned,
+                                                        date_purchased=holding.date_purchased,
+                                                        portfolio=portfolio)
             if not created:
-                model.update(qty=holding.qty_owned)
+                model.update(qty_owned=holding.qty_owned)
             model.save()
-            logger.success(f"Inserted into Holding: {holding}")
-    db.close()
+            logger.success(f"Inserted or updated Holding: {holding}")
 
 
 @timed
@@ -122,14 +120,13 @@ def insert_into_transactions_table(*transactions: Transaction, portfolio: str):
     :param transactions: (positional) Transaction objects to be inserted into the Transaction table.
     :return: None
     """
-    db.connect()
     with db.atomic():
         for transaction in transactions:
+            del transaction.market_value
             model, _ = TransactionModel.get_or_create(**vars(transaction), portfolio=portfolio)
             model.save()
             logger.success(f"Inserted into Transaction: "
                            f"{transaction.symbol}: {transaction.order_type} {transaction.direction}")
-    db.close()
 
 
 @timed
@@ -140,11 +137,10 @@ def insert_into_portfolio_table(portfolio: str, value: float, timestamp: datetim
     :param timestamp: (kwarg) timestamp of when value was entered into the db.
     :return: None
     """
-    db.connect()
-    model, _ = PortfolioModel.get_or_create(date=timestamp, portfolio=portfolio, value=value)
-    model.save()
-    logger.success(f"Inserted into Portfolio a new value for {portfolio} - {currency(value)} <{timestamp}>")
-    db.close()
+    with db:
+        model, _ = PortfolioModel.get_or_create(date=timestamp, portfolio=portfolio, value=value)
+        model.save()
+        logger.success(f"Inserted into Portfolio a new value for {portfolio} - {currency(value)} <{timestamp}>")
 
 
 @timed
@@ -154,59 +150,53 @@ def fetch_from_company_table(*symbols: str, every: bool = False) -> List[Company
     :param every: (kwarg) set to True for all companies in the table.
     :return: a list of Company objects returned from query.
     """
-    db.connect()
-    companies = []
-    symbols = map(normalize_symbol, symbols)
-    if every:
-        companies.append(CompanyModel.select().get())
-    else:
-        for symbol in symbols:
-            company = CompanyModel.get(CompanyModel.symbol == symbol)
-            companies.append(company)
-
-    db.close()
+    with db.atomic():
+        companies = []
+        symbols = map(normalize_symbol, symbols)
+        if every:
+            companies.append(CompanyModel.select().get())
+        else:
+            for symbol in symbols:
+                try:
+                    company = CompanyModel.get(CompanyModel.symbol == symbol)
+                except DoesNotExist as err:
+                    logger.warning(err)
+                    continue
+                companies.append(company)
     return [Company(**company.__data__) for company in companies]
 
 
 @timed
-def fetch_from_holdings_table(*symbols: str, portfolio: str, every: bool = False) -> List[Holding]:
+def fetch_from_holdings_table(portfolio: str) -> List[Holding]:
     """
-    :param symbols: (positional) symbols to retrieve associated Holding objects.
     :param portfolio: (kwarg) portfolio name associated with the desired holdings.
-    :param every: (kwarg) set to True for all holdings associated with given portfolio.
     :return: a list of Holding objects returned from query.
     """
-    db.connect()
-    holdings = []
-    if every:
-        holdings.append(HoldingModel.select().get(HoldingModel.portfolio == portfolio))
-    else:
-        for symbol in symbols:
-            holding = HoldingModel.get(HoldingModel.symbol == symbol and HoldingModel.portfolio == portfolio)
-            holdings.append(holding)
-    db.close()
-    return [Holding(**holding.__data__) for holding in holdings]
+    with db:
+        holdings_query = HoldingModel.select().where(HoldingModel.portfolio == portfolio)
+        holdings = [Holding(symbol=holding.symbol, qty_owned=holding.qty_owned, date_purchased=holding.date_purchased)
+                    for holding in holdings_query]
+    return holdings
 
 
 @timed
 def fetch_from_transactions_table(*symbols: str, portfolio: str, every: bool = False) -> List[Transaction]:
     """
-    :param symbols: (positional) symbols to retrieve associated Holding objects.
+    :param symbols: (positional) symbols to retrieve associated Transaction objects.
     :param portfolio: (kwarg) portfolio name associated with the desired holdings.
     :param every: (kwarg) set to True for all holdings associated with given portfolio.
     :return: a list of Holding objects returned from query.
     """
-    db.connect()
-    transactions = []
-    if every:
-        transactions.append(TransactionModel.select().get(TransactionModel.portfolio == portfolio))
-    else:
-        for symbol in symbols:
-            transaction = TransactionModel.get(
-                TransactionModel.symbol == symbol and TransactionModel.portfolio == portfolio
-            )
-            transactions.append(transaction)
-    db.close()
+    with db:
+        transactions = []
+        if every:
+            transactions.append(TransactionModel.select().get(TransactionModel.portfolio == portfolio))
+        else:
+            for symbol in symbols:
+                transaction = TransactionModel.get(
+                    TransactionModel.symbol == symbol and TransactionModel.portfolio == portfolio
+                )
+                transactions.append(transaction)
     return [Transaction(**transaction.__data__) for transaction in transactions]
 
 
@@ -217,14 +207,14 @@ def fetch_from_portfolio_table(portfolio: str, timestamp: Optional[datetime] = N
     :param timestamp: optional argument to retrieve portfolio value on a given date/time.
     :return: List of portfolio values enumerated by date.
     """
-    db.connect()
-    value_history = []
-    if not timestamp:
-        value_history.append(PortfolioModel.select().get(PortfolioModel.portfolio == portfolio))
-    else:
-        value_history.append(PortfolioModel.select().get(
-            PortfolioModel.portfolio == portfolio and PortfolioModel.date == timestamp)
-        )
+    with db:
+        value_history = []
+        if not timestamp:
+            value_history.append(PortfolioModel.select().get(PortfolioModel.portfolio == portfolio))
+        else:
+            value_history.append(PortfolioModel.select().get(
+                PortfolioModel.portfolio == portfolio and PortfolioModel.date == timestamp)
+            )
     return value_history
 
 
@@ -232,16 +222,15 @@ def get_unique_sectors_and_industries():
     """
     :return: Dict containing two lists, one for all unique company sectors, and one for unique industries.
     """
-    db.connect()
-    unique_sectors = []
-    models_sector = CompanyModel.select(CompanyModel.sector).distinct()
-    for model in models_sector:
-        unique_sectors.append(model.sector)
-    unique_industries = []
-    models_industry = CompanyModel.select(CompanyModel.industry).distinct()
-    for model in models_industry:
-        unique_industries.append(model.industry)
-    db.close()
+    with db:
+        unique_sectors = []
+        models_sector = CompanyModel.select(CompanyModel.sector).distinct()
+        for model in models_sector:
+            unique_sectors.append(model.sector)
+        unique_industries = []
+        models_industry = CompanyModel.select(CompanyModel.industry).distinct()
+        for model in models_industry:
+            unique_industries.append(model.industry)
     return {
         "unique_sectors": unique_sectors,
         "unique_industries": unique_industries
@@ -254,7 +243,7 @@ if __name__ == "__main__":
 
     def populate_company_table_with_defaults():
         """Populate the Company table / model with company data (pulled from snp500 constituents list)."""
-        snp_constituents = download_index_constituents()
+        snp_constituents = download_index_constituents(...)
         map_download = partial(download_ticker_data, include_metadata=True)
         all_stock_data = use_threadpool_exec(func=map_download, iterable=snp_constituents)
         all_stock_data = list(filter(None, all_stock_data))  # Filter out any downloads that returned nothing
@@ -285,14 +274,6 @@ if __name__ == "__main__":
     # aapl = aapl[0]
     # print(aapl)
 
-    # print(fetch_from_company_table(every=True))
-
-    uniques = get_unique_sectors_and_industries()
-    sectors = uniques['unique_sectors']
-    industries = uniques['unique_industries']
-    for m in sectors:
-        print(m.sector)
-    for i, m in enumerate(industries):
-        print(m.industry)
-        print(i)
-
+    h = fetch_from_holdings_table("MyPortfolio")
+    for hold in h:
+        print(vars(hold))
