@@ -39,15 +39,19 @@ class Stock(Asset):
     ):
         self.asset_type = AssetType.Stock
         self.symbol = normalize_symbol(symbol)
+        """Try and retrieve locally stored company/market data information if not already passed in."""
         if company is None:
-            company = fetch_from_company_table(symbol)[0]
+            try:
+                company = fetch_from_company_table(symbol)[0]
+            except Exception as err:  # probably throws some sqlite exception if there is no company model.
+                logger.warning(err)
         self.company = company
         _path = os.path.join(Stock.TICKER_DATA_PATH, f"{normalize_symbol(symbol)}.csv")
         if market_data is None:
             if not os.path.exists(_path):
-                logger.warning(f"Market data for symbol {symbol} has no corresponding csv file ({_path}).")
                 self._refresh_market_data(replace=True)
             market_data = load_ticker_market_data_from_csv(symbol=symbol)
+        """End of local data search."""
         self.market_data = market_data
         self._market_data_path = _path
 
@@ -60,30 +64,28 @@ class Stock(Asset):
         now = datetime.now()
         data_lag = now - self._get_last_data_refresh_time()
         if data_lag > timedelta(days=1):
-            logger.warning(f"Local data for {self.symbol} is behind by ({data_lag}).")
             self._refresh_market_data()
-
         return self.market_data['Close'].iloc[-1]
 
     def _get_last_data_refresh_time(self) -> datetime:
         """
-        Get the last modification time of the respective csv market data file to see
-        if data refresh is necessary.
+        Get the last modification time of the respective csv file, to see if data refresh is necessary.
         """
         return datetime.fromtimestamp(os.path.getmtime(self._market_data_path))
 
     def _refresh_market_data(self, replace: bool = False):
         """
-        :param replace: if no csv is found or we just want to populate the csv file with entirely new data.
-        Update the ticker market data csv file if more than 1 day has elapsed since restart
+        :param: replace: if no csv is found, or we just want to populate the csv file with entirely new data.
+        Update the ticker market data csv file if more than 1 day has elapsed since refresh
         (assuming not intraday data).
         """
         logger.debug(f"Refreshing data for {self.symbol}.")
         if replace:
             download_ticker_data(symbol=self.symbol)
         else:
-            last_date = pd.to_datetime(self.market_data.index[-1]).to_pydatetime()
+            last_date = pd.to_datetime(self.market_data.index[-1]).to_pydatetime() + timedelta(days=1)
             download_ticker_data(symbol=self.symbol, start_date=last_date, append_data=True)
+        self.market_data = load_ticker_market_data_from_csv(self.symbol)
 
     def __str__(self):
         return (f"          [Stock] \n"
@@ -95,8 +97,3 @@ class Stock(Asset):
     def __repr__(self):
         return "Stock<asset_type=AssetType.Stock, symbol, Company, live_price>"
 
-
-if __name__ == "__main__":
-    ticker = " gm "
-    stock = Stock(symbol=ticker, market_data=load_ticker_market_data_from_csv(ticker))
-    print(stock)

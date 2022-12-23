@@ -18,17 +18,22 @@ TICKER_DATA_PATH = os.path.join(module_path, cfg["TICKER_DATA_PATH"])
 
 
 @timed
-def mass_download_data(
+def download_multiple_ticker_data(
         *symbols: str,
-        start_date: date = None,
-        end_date: Optional[date] = date.today(),
-        period: Optional[str] = None,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+        period: Optional[str] = "max",
         interval: Optional[str] = "1d"
 ) -> pd.DataFrame:
     """
-    Fetch ticker market data for multiple stocks. Period (e.g. 1d) can be passed in-leu of start & end date.
+    Fetch market data for multiple stocks.
+    :param symbols: symbols to retrieve market data for.
+    :param start_date: start date of market data.
+    :param end_date: optional end date (default to date.today())
+    :param period: alternative to start/end date - max, 1w, etc.
+    :param interval: time between data points - 1w, 1mo, etc.
+    :return: pd.DataFrame
     """
-    assert start_date or period, "Must pass in either a start date or a period"
     if start_date and not end_date:
         end_date = date.today()
     if period and period not in VALID_PERIODS:
@@ -37,7 +42,7 @@ def mass_download_data(
         raise ValueError(f"Interval '{interval}' invalid - Options: {VALID_INTERVALS}")
     symbols = map(normalize_symbol, symbols)
     tickers_joined = " ".join(symbols)
-    logger.debug(f"Fetching data for {symbols}")
+    logger.debug(f"Fetching data for {len(symbols)} symbols.")
     ticker_data: pd.DataFrame = yf.download(
         tickers_joined, start=start_date, end=end_date, group_by="ticker",
         period=period, interval=interval
@@ -66,9 +71,8 @@ def download_ticker_data(
     :param include_metadata: include information about the company.
     :param use_cache: use requests_cache to store api call.
     :param append_data: append data to the corresponding data csv file.
-    :return: None
+    :return: Dict[metadata, market_data]
     """
-    assert start_date or period
     if start_date and not end_date:
         end_date = date.today()
     if period and period not in VALID_PERIODS:
@@ -81,9 +85,7 @@ def download_ticker_data(
     else:
         session = None
     symbol = normalize_symbol(symbol)
-    stock_data = yf.Ticker(
-        symbol, session=session
-    )
+    stock_data = yf.Ticker(symbol, session=session)
     metadata = stock_data.info if include_metadata else None
     if metadata and metadata.get("longName", None) is None:
         logger.warning(f"Metadata missing for symbol download {symbol}")
@@ -99,11 +101,12 @@ def download_ticker_data(
     }
 
 
-@timed
-def download_index_constituents(
-        index_url: str = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
-) -> List[str]:
-    """Fetch constituents list (symbols) for given index (default is snp500)."""
+def download_index_constituents(index_url: str) -> List[str]:
+    """
+    Fetch constituents list for a given stock index. Default to snp500.
+    :param: index_url: url to page where list of symbols can be read.
+    :return: list[symbols]
+    """
     table = pd.read_html(index_url)
     df = table[0]
     tickers = df['Symbol']
@@ -112,7 +115,11 @@ def download_index_constituents(
 
 def save_ticker_market_data_to_csv(symbol: str, market_data: pd.DataFrame, append: bool = False) -> None:
     """
-    Save downloaded market data for given ticker.
+    Save downloaded market data for given ticker to local csv.
+    :param: symbol: corresponding stock ticker (will be name of csv).
+    :param: market_data: data to save.
+    :param: append: if append, new data will be appended to the csv file.
+    :return: None.
     """
     symbol = normalize_symbol(symbol)
     path = os.path.join(TICKER_DATA_PATH, f'{symbol}.csv')
@@ -126,27 +133,11 @@ def save_ticker_market_data_to_csv(symbol: str, market_data: pd.DataFrame, appen
 def load_ticker_market_data_from_csv(symbol: str) -> pd.DataFrame:
     """
     Load downloaded market data for given ticker (from csv).
+    :param symbol: corresponding stock ticker (will be name of csv).
+    :return: pd.DataFrame (market data).
     """
     symbol = normalize_symbol(symbol)
     path = os.path.join(TICKER_DATA_PATH, f'{symbol}.csv')
     market_data = pd.read_csv(filepath_or_buffer=path, index_col="Date")
     return market_data
-
-
-if __name__ == "__main__":
-    # tickers = ["aapl ", " msft", " meta", "  g m "]
-    # data = mass_download_data(*tickers, start_date=date(2017, 1, 1))
-    # print(type(data))
-    # cfg = load_cfg()
-    # ticker_data_path = cfg["TICKER_DATA_PATH"] + "test"
-    # data.to_csv(ticker_data_path)
-    # ticker = " aapl"
-    # data = download_ticker_data(
-    #     ticker, period="5d", include_metadata=True
-    # )
-    # print(data['market_data'])
-    # ticks = download_index_constituents()
-    # ticks_data = use_threadpool_exec(download_ticker_data, ticks)
-    pass
-
 
