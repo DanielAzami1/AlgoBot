@@ -12,6 +12,7 @@ from sdk.data.request_data import (
     download_ticker_data,
     load_ticker_data_csv,
 )
+from sdk.factors.technical_indicators import TechnicalIndicators
 
 
 class Stock:
@@ -48,7 +49,7 @@ class Stock:
         if not d:
             price = self.market_data["Close"].iloc[-1]
         else:
-            price = self.market_data.loc[pd.DatetimeIndex(d), 'Close'].values[0]
+            price = self.market_data.loc[str(d) + " 00:00:00-05:00", 'Close']  # saved all the data with a timestamp :(
         return price
 
     def get_returns(self, interval: str = 'daily') -> pd.Series:
