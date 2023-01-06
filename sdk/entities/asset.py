@@ -7,12 +7,16 @@ from loguru import logger
 from datetime import date, datetime, timedelta
 import textwrap
 from sdk.misc.enums import AssetType
-from sdk.misc.utils import normalize_symbol, currency, load_cfg, format_datetime_12h
+from sdk.misc.utils import (
+    normalize_symbol,
+    currency,
+    load_cfg,
+    format_datetime_12h
+)
 from sdk.data.request_data import (
     download_ticker_data,
     load_ticker_data_csv,
 )
-from sdk.factors.technical_indicators import TechnicalIndicators
 
 
 class Stock:
@@ -51,38 +55,6 @@ class Stock:
         else:
             price = self.market_data.loc[str(d) + " 00:00:00-05:00", 'Close']  # saved all the data with a timestamp :(
         return price
-
-    def get_returns(self, interval: str = 'daily') -> pd.Series:
-        """
-        :param interval: specifies the interval to calculate returns over (daily, monthly, yearly)
-        :return: returns bucketed via interval based on close prices.
-        """
-        try:
-            return self.metrics[f'{interval}_returns']
-        except KeyError:
-            pass
-        prices = self.market_data['Close']
-        if interval == 'yearly':
-            period = 252
-        elif interval == 'monthly':
-            period = 21
-        else:
-            period = 1
-        returns = prices.pct_change(periods=period)
-        self.metrics[f'{interval}_returns'] = returns
-        return returns
-
-    def get_std(self):
-        """
-        :return: standard deviation of % returns.
-        """
-        try:
-            return self.metrics["std"]
-        except KeyError:
-            pass
-        std = self.get_returns().std()
-        self.metrics["std"] = std
-        return std
 
     def __refresh_market_data(self, replace: bool = False):
         """

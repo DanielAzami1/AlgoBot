@@ -1,21 +1,27 @@
 from entities.asset import Stock
 from data.models import fetch_from_company_table
 import datetime
-
+import pprint as pp
+import pandas as pd
+from sdk.factors.technical_indicators import Metrics, TechnicalIndicators
 
 ticker = "aapl"
 company = fetch_from_company_table(ticker)[0]
-stock = Stock(ticker, company)
+aapl = Stock(ticker, company)
 
-print(stock)
+# aapl.metrics['pct_returns'] = Metrics.percent_returns(prices_or_values=aapl.market_data['Close'])
+# aapl.metrics['rolling_std'] = Metrics.rolling_std(pct_returns=aapl.metrics['pct_returns'])
+# aapl.metrics['sma'] = Metrics.sma(prices_or_values=aapl.market_data['Close'])
+# aapl.metrics['ema'] = Metrics.ema(prices_or_values=aapl.market_data['Close'])
+#
+#
+# metrs = pd.DataFrame.from_dict(aapl.metrics)
+# print(metrs)
+#
+# print(Metrics.max_drawdown(aapl.market_data['Close']))
 
-daily_returns = stock.get_returns(interval='daily')
+atr = TechnicalIndicators.atr(hlc_price_data=aapl.market_data)
 
-print(type(stock.metrics['daily_returns']))
+print(atr)
 
-std = stock.get_std()
-print(std)
-
-d = datetime.date(2000, 1, 4)
-
-print(stock.get_price(d=d))
+print(atr.head())
