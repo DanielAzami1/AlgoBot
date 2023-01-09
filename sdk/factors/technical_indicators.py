@@ -6,6 +6,7 @@ class Metrics:
     """
     Grouping for various Metrics calculations methods.
     """
+
     @classmethod
     def percent_returns(cls, prices_or_values: pd.Series, interval: str = 'daily') -> pd.Series:
         """
@@ -83,6 +84,7 @@ class TechnicalIndicators:
     Using this link for inspo for now:
     https://www.investopedia.com/top-7-technical-analysis-tools-4773275
     """
+
     @classmethod
     def obv(cls, prices_and_volume: pd.DataFrame) -> pd.Series:
         """
@@ -128,20 +130,16 @@ class TechnicalIndicators:
         {{ Average True Range }}
         measures market volatility by decomposing the entire range of an asset price
         for that period, typically derived from the 14-day simple moving average of a series of true range indicators.
+        :param n: periods used to calculate the average true range
         :param hlc_price_data: High, Low, Close price data
         :return: Average True Range
         """
-        n = len(hlc_price_data)
-        high = hlc_price_data['High']
-        low = hlc_price_data['Low']
-        close = hlc_price_data['Close']
-        # calculate TR (True Range)
-        tr_func = lambda price_data: max(
-            price_data['High'] - price_data['Low'],
-            abs(price_data['High'] - price_data.shift(-1)['Close']),
-            abs(price_data['Low'] - price_data.shift(-1)['Close'])
-        )
-        tr = hlc_price_data.apply (func=tr_func, axis=1)
+        n = 14
+        tr = pd.DataFrame({
+            'hl': hlc_price_data['High'] - hlc_price_data['Low'],
+            'hc': abs(hlc_price_data['High'] - hlc_price_data['Close'].shift(-1)),
+            'lc': abs(hlc_price_data['Low'] - hlc_price_data['Close'].shift(-1))
+        }).max(axis=1)
         atr = tr.cumsum() / n
         atr.name = "atr"
         return atr
@@ -155,4 +153,9 @@ class TechnicalIndicators:
         :param hlc_price_data: High, Low, Close price data
         :return: Average Directional Index
         """
-        pass
+        n = 14
+        dm_pos = hlc_price_data['High'].shift(1) - hlc_price_data['High']
+        smoothed_dm_pos = dm_pos.cumsum()
+        dm_neg = hlc_price_data['Low'] - hlc_price_data['Low'].shift(1)
+
+        smoothed
