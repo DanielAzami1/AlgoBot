@@ -4,7 +4,7 @@ import pandas as pd
 import pathlib
 import os
 from loguru import logger
-from datetime import date, datetime, timedelta
+from datetime import datetime, timedelta
 import textwrap
 from sdk.misc.enums import AssetType
 from sdk.misc.utils import (
@@ -32,29 +32,36 @@ class Stock:
         module_path = pathlib.Path(__file__).parent.resolve()
         cfg = load_cfg(prepend_path=os.path.join(module_path, ".."))
         ticker_data_path = os.path.join(module_path, "..", "data", cfg["TICKER_DATA_PATH"])
-        __path = os.path.join(ticker_data_path, f"{normalize_symbol(symbol)}.csv")
+        self.__market_data_path = os.path.join(ticker_data_path, f"{normalize_symbol(symbol)}.csv")
         if market_data is None:
-            if not os.path.exists(__path):
+            if not os.path.exists(self.__market_data_path):
                 self.__refresh_market_data(replace=True)
-            market_data = load_ticker_data_csv(symbol=symbol)
-        self.market_data = market_data
-        self.__market_data_path = __path
+        else:
+            self.market_data = market_data
+
+        if self.__data_needs_update():
+            self.__refresh_market_data(replace=False)
         self.metrics = {}
 
     def get_price(self, d: datetime.date = None) -> float:
         """
         :return: stock price on date d. Most recent price is returned if d not supplied.
         """
-        now = datetime.now()
-        #  check to see if local csv data needs to be updated.
-        data_lag = now - datetime.fromtimestamp(os.path.getmtime(self.__market_data_path))
-        if data_lag > timedelta(days=1):
+        if self.__data_needs_update():
             self.__refresh_market_data()
         if not d:
             price = self.market_data["Close"].iloc[-1]
         else:
             price = self.market_data.loc[str(d) + " 00:00:00-05:00", 'Close']  # saved all the data with a timestamp :(
         return price
+
+    def __data_needs_update(self) -> bool:
+        now = datetime.now()
+        # get last modification date of local csv file
+        data_lag = now - datetime.fromtimestamp(os.path.getmtime(self.__market_data_path))
+        if data_lag > timedelta(days=1):
+            return True
+        return False
 
     def __refresh_market_data(self, replace: bool = False):
         """

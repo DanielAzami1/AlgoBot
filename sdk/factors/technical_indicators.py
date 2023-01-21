@@ -1,12 +1,11 @@
 import pandas as pd
 import numpy as np
-
+import pandas_ta as ta
 
 class Metrics:
     """
     Grouping for various Metrics calculations methods.
     """
-
     @classmethod
     def percent_returns(cls, prices_or_values: pd.Series, interval: str = 'daily') -> pd.Series:
         """
@@ -23,6 +22,16 @@ class Metrics:
         percent_returns = prices_or_values.pct_change(periods=period)
         percent_returns.name = "pct_returns"
         return percent_returns.fillna(0)
+
+    @classmethod
+    def log_returns(cls, prices_or_values: pd.Series):
+        """
+        :param prices_or_values: close prices of stock or total values of portfolio
+        :return: log returns
+        """
+        log_returns = np.log(prices_or_values) - np.log(prices_or_values.shift(1))
+        log_returns.name = "log_returns"
+        return log_returns.fillna(0)
 
     @classmethod
     def rolling_std(cls, pct_returns: pd.Series, window: int = 30) -> pd.Series:
@@ -147,6 +156,7 @@ class TechnicalIndicators:
     @classmethod
     def adx(cls, hlc_price_data: pd.DataFrame) -> pd.Series:
         """
+        {{ Average Directional Index }}
         The ADX is the main line on the indicator, usually colored black. There are two additional lines that can be
         optionally shown. These are DI+ and DI-. These lines are often colored red and green, respectively. All three
         lines work together to show the direction of the trend as well as the momentum of the trend.
@@ -157,5 +167,3 @@ class TechnicalIndicators:
         dm_pos = hlc_price_data['High'].shift(1) - hlc_price_data['High']
         smoothed_dm_pos = dm_pos.cumsum()
         dm_neg = hlc_price_data['Low'] - hlc_price_data['Low'].shift(1)
-
-        smoothed
